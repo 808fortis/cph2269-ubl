@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use rusb::{DeviceList, Direction, TransferType};
 use std::time::{Duration, Instant};
 
@@ -82,25 +82,54 @@ impl MtkUsb {
 
     pub fn bulk_write(&self, data: &[u8]) -> Result<()> {
         let mut written = 0;
+        let mut retries = 3;
         while written < data.len() {
-            let n = self
+            match self
                 .handle
                 .write_bulk(self.ep_out, &data[written..], TIMEOUT)
-                .context("Bulk write failed")?;
-            if n == 0 {
-                bail!("Bulk write returned 0");
+            {
+                Ok(n) => {
+                    if n == 0 {
+                        bail!("Bulk write returned 0");
+                    }
+                    written += n;
+                    retries = 3;
+                }
+                Err(rusb::Error::Pipe) => {
+                    if retries == 0 {
+                        bail!("Bulk write failed (stalled, no retries left)");
+                    }
+                    log::warn!("Bulk write stall, clearing halt (retries left: {})", retries - 1);
+                    let _ = self.handle.clear_halt(self.ep_out);
+                    retries -= 1;
+                }
+                Err(e) => {
+                    bail!("Bulk write failed: {}", e);
+                }
             }
-            written += n;
         }
         Ok(())
     }
 
     pub fn bulk_read(&self, size: usize) -> Result<Vec<u8>> {
         let mut buf = vec![0u8; size];
-        let n = self
-            .handle
-            .read_bulk(self.ep_in, &mut buf, TIMEOUT)
-            .context("Bulk read failed")?;
+        let mut retries = 3;
+        let n = loop {
+            match self.handle.read_bulk(self.ep_in, &mut buf, TIMEOUT) {
+                Ok(n) => break n,
+                Err(rusb::Error::Pipe) => {
+                    if retries == 0 {
+                        bail!("Bulk read failed (stalled, no retries left)");
+                    }
+                    log::warn!("Bulk read stall, clearing halt (retries left: {})", retries - 1);
+                    let _ = self.handle.clear_halt(self.ep_in);
+                    retries -= 1;
+                }
+                Err(e) => {
+                    bail!("Bulk read failed: {}", e);
+                }
+            }
+        };
         buf.truncate(n);
         Ok(buf)
     }
