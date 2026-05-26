@@ -349,5 +349,5 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default().with_inner_size([640.0, 500.0]).with_resizable(true),
         ..Default::default()
     };
-    eframe::run_native("MTK Flash Tool", options, Box::new(|_cc| Ok(Box::new(MtkApp::default()))))
+    eframe::run_native("cph2269-ubl", options, Box::new(|_cc| Ok(Box::new(MtkApp::default()))))
 }
