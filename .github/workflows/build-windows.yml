@@ -25,4 +25,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mtk-unlock-windows
-          path: target/release/mtk-unlock.exe
+          path: target/release/cph2269-ubl.exe
