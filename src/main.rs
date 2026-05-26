@@ -260,7 +260,7 @@ impl eframe::App for MtkApp {
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
 
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.heading("MTK Flash Tool");
+            ui.heading("CPH2269-ubl");
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {

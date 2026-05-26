@@ -1,9 +1,11 @@
 use anyhow::{bail, Context, Result};
 use rusb::{DeviceList, Direction, TransferType};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const MTK_VID: u16 = 0x0E8D;
-const TIMEOUT: Duration = Duration::from_secs(30);
+const TIMEOUT: Duration = Duration::from_secs(60);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
+const POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 pub struct MtkUsb {
     handle: rusb::DeviceHandle<rusb::GlobalContext>,
@@ -14,6 +16,17 @@ pub struct MtkUsb {
 
 impl MtkUsb {
     pub fn connect() -> Result<Self> {
+        let start = Instant::now();
+        while start.elapsed() < CONNECT_TIMEOUT {
+            if let Ok(dev) = Self::try_connect_once() {
+                return Ok(dev);
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        }
+        bail!("No MediaTek device (VID 0x{:04X}) found in BROM mode (timeout {}s)", MTK_VID, CONNECT_TIMEOUT.as_secs());
+    }
+
+    fn try_connect_once() -> Result<Self> {
         let devices = DeviceList::new()?;
         for device in devices.iter() {
             let desc = match device.device_descriptor() {
@@ -64,7 +77,7 @@ impl MtkUsb {
             log::info!("USB: EP_OUT=0x{:02x} EP_IN=0x{:02x} wMax={}", ep_out, ep_in, wmax);
             return Ok(MtkUsb { handle, ep_out, ep_in, wmax });
         }
-        bail!("No MediaTek device (VID 0x{:04X}) found in BROM mode", MTK_VID);
+        bail!("No MediaTek device found this poll");
     }
 
     pub fn bulk_write(&self, data: &[u8]) -> Result<()> {
